@@ -6,7 +6,7 @@ const linux = os.linux;
 
 const testing = std.testing;
 
-fn testReadWithTimeoutRepro(read_fd: os.fd_t, read_err: os.E, timeout_err: os.E) !void {
+fn testReadWithTimeoutRepro(read_fd: os.fd_t, read_err: i32, timeout_err: i32) !void {
     if (builtin.os.tag != .linux) return error.SkipZigTest;
 
     var ring = IO_Uring.init(4, 0) catch |err| switch (err) {
@@ -43,9 +43,9 @@ fn testReadWithTimeoutRepro(read_fd: os.fd_t, read_err: os.E, timeout_err: os.E)
 
     for (cqes[0..num_ready_cqes]) |cqe| {
         if (cqe.user_data == read_user_data) {
-            try std.testing.expectEqual(@intCast(i32, @enumToInt(read_err)), -cqe.res);
+            try std.testing.expectEqual(read_err, -cqe.res);
         } else if (cqe.user_data == timeout_user_data) {
-            try std.testing.expectEqual(@intCast(i32, @enumToInt(timeout_err)), -cqe.res);
+            try std.testing.expectEqual(timeout_err, -cqe.res);
         } else {
             unreachable;
         }
@@ -61,8 +61,8 @@ test "read with timeout repro for stdin" {
     const ver_gte_5_15 = ver.compare(.gte, .{ .major = 5, .patchlevel = 15 });
     std.log.debug("ver={}, ver_gte_5_15={}\n", .{ ver, ver_gte_5_15 });
 
-    const read_err: os.E = .INVAL;
-    const timeout_err: os.E = if (ver_gte_5_15) .CANCELED else .BADF;
+    const read_err = @intCast(i32, @enumToInt(os.E.INVAL));
+    const timeout_err = @intCast(i32, @enumToInt(if (ver_gte_5_15) os.E.CANCELED else os.E.BADF));
     try testReadWithTimeoutRepro(std.io.getStdIn().handle, read_err, timeout_err);
 }
 
@@ -77,8 +77,8 @@ test "read with timeout repro for pipe" {
     defer os.close(pipe_fds[0]);
     defer os.close(pipe_fds[1]);
 
-    const read_err: os.E = if (ver_gte_5_15) .INTR else .INVAL;
-    const timeout_err: os.E = if (ver_gte_5_15) .ALREADY else .BADF;
+    const read_err = @intCast(i32, @enumToInt(if (ver_gte_5_15) os.E.INTR else os.E.INVAL));
+    const timeout_err = @intCast(i32, @enumToInt(if (ver_gte_5_15) os.E.ALREADY else os.E.BADF));
     try testReadWithTimeoutRepro(pipe_fds[0], read_err, timeout_err);
 }
 
